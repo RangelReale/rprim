@@ -25,6 +25,10 @@ func ConvertOp(dst, src reflect.Value, flags uint) ConvertOpFunc {
 	return NewConfigFl(flags).ConvertOp(dst, src)
 }
 
+func ConvertOpType(dstType reflect.Type, src reflect.Value, flags uint) ConvertOpFunc {
+	return NewConfigFl(flags).ConvertOpType(dstType, src)
+}
+
 // Struct to set optional parameters
 type Config struct {
 	Flags         uint
@@ -49,12 +53,16 @@ func NewConfigFl(flags uint) *Config {
 type ConvertOpFunc func(reflect.Value, reflect.Type) (reflect.Value, error)
 
 func (c Config) ConvertOp(dst, src reflect.Value) ConvertOpFunc {
+	return c.ConvertOpType(dst.Type(), src)
+}
+
+func (c Config) ConvertOpType(dstType reflect.Type, src reflect.Value) ConvertOpFunc {
 	srckind := IndirectType(src.Type()).Kind()
-	dstkind := IndirectType(dst.Type()).Kind()
+	dstkind := IndirectType(dstType).Kind()
 
 	// source value is nil
 	if src.Kind() == reflect.Ptr && src.IsNil() {
-		if dst.Kind() != reflect.Ptr && !((c.Flags & COP_ALLOW_NIL_TO_ZERO) == COP_ALLOW_NIL_TO_ZERO) {
+		if dstType.Kind() != reflect.Ptr && !((c.Flags & COP_ALLOW_NIL_TO_ZERO) == COP_ALLOW_NIL_TO_ZERO) {
 			return nil
 		}
 		return cvtNil
@@ -62,7 +70,7 @@ func (c Config) ConvertOp(dst, src reflect.Value) ConvertOpFunc {
 
 	// dst and src have same underlying type.
 	if dstkind == srckind {
-		if src.Kind() == reflect.Ptr || dst.Kind() == reflect.Ptr {
+		if src.Kind() == reflect.Ptr || dstType.Kind() == reflect.Ptr {
 			return cvtDirectPointer
 		} else {
 			return cvtDirect
@@ -122,7 +130,7 @@ func (c Config) ConvertOp(dst, src reflect.Value) ConvertOpFunc {
 			return cvtStringComplex(c.ComplexFormat)
 		case reflect.Slice:
 			if (c.Flags & COP_ALLOW_STRING_TO_SLICE) == COP_ALLOW_STRING_TO_SLICE {
-				switch dst.Elem().Kind() {
+				switch dstType.Elem().Kind() {
 				case reflect.Uint8:
 					return cvtStringBytes
 				case reflect.Int32:
