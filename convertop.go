@@ -49,8 +49,8 @@ func NewConfigFl(flags uint) *Config {
 type ConvertOpFunc func(reflect.Value, reflect.Type) (reflect.Value, error)
 
 func (c Config) ConvertOp(dst, src reflect.Value) ConvertOpFunc {
-	srckind := indirectType(src.Type()).Kind()
-	dstkind := indirectType(dst.Type()).Kind()
+	srckind := IndirectType(src.Type()).Kind()
+	dstkind := IndirectType(dst.Type()).Kind()
 
 	// source value is nil
 	if src.Kind() == reflect.Ptr && src.IsNil() {
@@ -159,9 +159,9 @@ func (c Config) ConvertOp(dst, src reflect.Value) ConvertOpFunc {
 // makeInt returns a Value of type t equal to bits (possibly truncated),
 // where t is a signed or unsigned int type.
 func makeInt(bits uint64, t reflect.Type) reflect.Value {
-	xt := indirectType(t)
+	xt := IndirectType(t)
 
-	x := reflect.New(indirectType(t)).Elem()
+	x := reflect.New(IndirectType(t)).Elem()
 	switch xt.Kind() {
 	case reflect.Uint:
 		x.Set(reflect.ValueOf(uint(bits)))
@@ -195,7 +195,7 @@ func makeInt(bits uint64, t reflect.Type) reflect.Value {
 // makeFloat returns a Value of type t equal to v (possibly truncated to float32),
 // where t is a float32 or float64 type.
 func makeFloat(v float64, t reflect.Type) reflect.Value {
-	xt := indirectType(t)
+	xt := IndirectType(t)
 
 	x := reflect.New(xt).Elem()
 	switch xt.Kind() {
@@ -215,7 +215,7 @@ func makeFloat(v float64, t reflect.Type) reflect.Value {
 // makeComplex returns a Value of type t equal to v (possibly truncated to complex64),
 // where t is a complex64 or complex128 type.
 func makeComplex(v complex128, t reflect.Type) reflect.Value {
-	xt := indirectType(t)
+	xt := IndirectType(t)
 
 	x := reflect.New(xt).Elem()
 	switch xt.Kind() {
@@ -233,7 +233,7 @@ func makeComplex(v complex128, t reflect.Type) reflect.Value {
 }
 
 func makeString(v string, t reflect.Type) reflect.Value {
-	xt := indirectType(t)
+	xt := IndirectType(t)
 	x := reflect.New(xt).Elem()
 	x.SetString(v)
 	if t.Kind() == reflect.Ptr {
@@ -243,7 +243,7 @@ func makeString(v string, t reflect.Type) reflect.Value {
 }
 
 func makeBytes(v []byte, t reflect.Type) reflect.Value {
-	xt := indirectType(t)
+	xt := IndirectType(t)
 	x := reflect.New(xt).Elem()
 	x.SetBytes(v)
 	if t.Kind() == reflect.Ptr {
@@ -253,7 +253,7 @@ func makeBytes(v []byte, t reflect.Type) reflect.Value {
 }
 
 func makeRunes(v []rune, t reflect.Type) reflect.Value {
-	xt := indirectType(t)
+	xt := IndirectType(t)
 	x := reflect.New(xt).Elem()
 	x.SetString(string(v))
 	if t.Kind() == reflect.Ptr {
@@ -437,7 +437,7 @@ func cvtDirect(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
 
 // ConvertOp: direct copy with pointers involved
 func cvtDirectPointer(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
-	xt := indirectType(typ)
+	xt := IndirectType(typ)
 	x := reflect.New(xt).Elem()
 	x.Set(reflect.Indirect(v))
 	if typ.Kind() == reflect.Ptr {
