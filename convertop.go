@@ -57,11 +57,16 @@ func (c Config) ConvertOp(src, dst reflect.Value) ConvertOpFunc {
 }
 
 func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOpFunc {
+	// source type is interface
+	if src.Kind() == reflect.Interface {
+		src = src.Elem()
+	}
+
 	srckind := IndirectType(src.Type()).Kind()
 	dstkind := IndirectType(dstType).Kind()
 
 	// source value is nil
-	if src.Kind() == reflect.Ptr && src.IsNil() {
+	if (src.Kind() == reflect.Ptr || src.Kind() == reflect.Interface) && src.IsNil() {
 		if (dstType.Kind() != reflect.Ptr && dstType.Kind() != reflect.Interface) && !((c.Flags & COP_ALLOW_NIL_TO_ZERO_VALUE) == COP_ALLOW_NIL_TO_ZERO_VALUE) {
 			return nil
 		}
@@ -282,88 +287,88 @@ func makeRunes(v []rune, t reflect.Type) reflect.Value {
 
 // ConvertOp: intXX -> [u]intXX
 func cvtInt(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeInt(uint64(reflect.Indirect(v).Int()), t), nil
+	return makeInt(uint64(IndirectPtrInterface(v).Int()), t), nil
 }
 
 // ConvertOp: uintXX -> [u]intXX
 func cvtUint(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeInt(reflect.Indirect(v).Uint(), t), nil
+	return makeInt(IndirectPtrInterface(v).Uint(), t), nil
 }
 
 // ConvertOp: floatXX -> intXX
 func cvtFloatInt(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeInt(uint64(int64(reflect.Indirect(v).Float())), t), nil
+	return makeInt(uint64(int64(IndirectPtrInterface(v).Float())), t), nil
 }
 
 // ConvertOp: floatXX -> uintXX
 func cvtFloatUint(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeInt(uint64(reflect.Indirect(v).Float()), t), nil
+	return makeInt(uint64(IndirectPtrInterface(v).Float()), t), nil
 }
 
 // ConvertOp: intXX -> floatXX
 func cvtIntFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeFloat(float64(reflect.Indirect(v).Int()), t), nil
+	return makeFloat(float64(IndirectPtrInterface(v).Int()), t), nil
 }
 
 // ConvertOp: uintXX -> floatXX
 func cvtUintFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeFloat(float64(reflect.Indirect(v).Uint()), t), nil
+	return makeFloat(float64(IndirectPtrInterface(v).Uint()), t), nil
 }
 
 // ConvertOp: floatXX -> floatXX
 func cvtFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeFloat(reflect.Indirect(v).Float(), t), nil
+	return makeFloat(IndirectPtrInterface(v).Float(), t), nil
 }
 
 // ConvertOp: complexXX -> complexXX
 func cvtComplex(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeComplex(reflect.Indirect(v).Complex(), t), nil
+	return makeComplex(IndirectPtrInterface(v).Complex(), t), nil
 }
 
 // ConvertOp: intXX -> string
 func cvtIntString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(strconv.FormatInt(reflect.Indirect(v).Int(), 10), t), nil
+	return makeString(strconv.FormatInt(IndirectPtrInterface(v).Int(), 10), t), nil
 }
 
 // ConvertOp: uintXX -> string
 func cvtUintString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(strconv.FormatUint(reflect.Indirect(v).Uint(), 10), t), nil
+	return makeString(strconv.FormatUint(IndirectPtrInterface(v).Uint(), 10), t), nil
 }
 
 // ConvertOp: floatXX -> string
 func cvtFloatString(format string) ConvertOpFunc {
 	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-		return makeString(fmt.Sprintf(format, reflect.Indirect(v).Float()), t), nil
+		return makeString(fmt.Sprintf(format, IndirectPtrInterface(v).Float()), t), nil
 	}
 }
 
 /*
 func cvtFloatString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(fmt.Sprintf("%f", reflect.Indirect(v).Float()), t), nil
+	return makeString(fmt.Sprintf("%f", IndirectPtrInterface(v).Float()), t), nil
 }
 */
 
 // ConvertOp: complexXX -> string
 func cvtComplexString(format string) ConvertOpFunc {
 	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-		return makeString(fmt.Sprintf(format, reflect.Indirect(v).Complex()), t), nil
+		return makeString(fmt.Sprintf(format, IndirectPtrInterface(v).Complex()), t), nil
 	}
 }
 
 /*
 func cvtComplexString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(fmt.Sprintf("%g", reflect.Indirect(v).Complex()), t), nil
+	return makeString(fmt.Sprintf("%g", IndirectPtrInterface(v).Complex()), t), nil
 }
 */
 
 // ConvertOp: []byte -> string
 func cvtBytesString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(string(reflect.Indirect(v).Bytes()), t), nil
+	return makeString(string(IndirectPtrInterface(v).Bytes()), t), nil
 }
 
 // ConvertOp: string -> intXX
 func cvtStringInt(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	cv, err := strconv.ParseInt(reflect.Indirect(v).String(), 10, 64)
+	cv, err := strconv.ParseInt(IndirectPtrInterface(v).String(), 10, 64)
 	if err != nil {
 		return reflect.Value{}, fmt.Errorf("Error converting string to int: %v", err)
 	}
@@ -372,7 +377,7 @@ func cvtStringInt(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 
 // ConvertOp: string -> uintXX
 func cvtStringUint(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	cv, err := strconv.ParseUint(reflect.Indirect(v).String(), 10, 64)
+	cv, err := strconv.ParseUint(IndirectPtrInterface(v).String(), 10, 64)
 	if err != nil {
 		return reflect.Value{}, fmt.Errorf("Error converting string to uint: %v", err)
 	}
@@ -383,7 +388,7 @@ func cvtStringUint(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 func cvtStringFloat(format string) ConvertOpFunc {
 	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 		var cv float64
-		_, err := fmt.Sscanf(reflect.Indirect(v).String(), format, &cv)
+		_, err := fmt.Sscanf(IndirectPtrInterface(v).String(), format, &cv)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("Error converting string to float: %v", err)
 		}
@@ -394,7 +399,7 @@ func cvtStringFloat(format string) ConvertOpFunc {
 /*
 func cvtStringFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 	var cv float64
-	_, err := fmt.Sscanf(reflect.Indirect(v).String(), "%f", &cv)
+	_, err := fmt.Sscanf(IndirectPtrInterface(v).String(), "%f", &cv)
 	if err != nil {
 		return reflect.Value{}, fmt.Errorf("Error converting string to float: %v", err)
 	}
@@ -407,7 +412,7 @@ func cvtStringFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 func cvtStringComplex(format string) ConvertOpFunc {
 	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 		var cv complex128
-		_, err := fmt.Sscanf(reflect.Indirect(v).String(), format, &cv)
+		_, err := fmt.Sscanf(IndirectPtrInterface(v).String(), format, &cv)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("Error converting string to complex: %v", err)
 		}
@@ -418,7 +423,7 @@ func cvtStringComplex(format string) ConvertOpFunc {
 /*
 func cvtStringComplex(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 	var cv complex128
-	_, err := fmt.Sscanf(reflect.Indirect(v).String(), "%g", &cv)
+	_, err := fmt.Sscanf(IndirectPtrInterface(v).String(), "%g", &cv)
 	if err != nil {
 		return reflect.Value{}, fmt.Errorf("Error converting string to complex: %v", err)
 	}
@@ -428,17 +433,17 @@ func cvtStringComplex(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 
 // ConvertOp: string -> []byte
 func cvtStringBytes(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeBytes([]byte(reflect.Indirect(v).String()), t), nil
+	return makeBytes([]byte(IndirectPtrInterface(v).String()), t), nil
 }
 
 // ConvertOp: []rune -> string
 func cvtRunesString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(string(reflect.Indirect(v).Interface().([]int32)), t), nil
+	return makeString(string(IndirectPtrInterface(v).Interface().([]int32)), t), nil
 }
 
 // ConvertOp: string -> []rune
 func cvtStringRunes(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeRunes([]rune(reflect.Indirect(v).String()), t), nil
+	return makeRunes([]rune(IndirectPtrInterface(v).String()), t), nil
 }
 
 // ConvertOp: direct copy
@@ -452,7 +457,7 @@ func cvtDirect(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
 func cvtDirectPointer(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
 	xt := IndirectType(typ)
 	x := reflect.New(xt).Elem()
-	x.Set(reflect.Indirect(v))
+	x.Set(IndirectPtrInterface(v))
 	if typ.Kind() == reflect.Ptr {
 		return x.Addr(), nil
 	}
