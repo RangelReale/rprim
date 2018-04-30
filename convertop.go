@@ -22,11 +22,11 @@ const (
 // String conversion are supported using the strconv package
 // Conversing between pointers are allowed, including of different types.
 func ConvertOp(src, dst reflect.Value, flags uint) ConvertOpFunc {
-	return NewConfigFl(flags).ConvertOp(src, dst)
+	return NewConfig().SetFlags(flags).ConvertOp(src, dst)
 }
 
 func ConvertOpType(src reflect.Value, dstType reflect.Type, flags uint) ConvertOpFunc {
-	return NewConfigFl(flags).ConvertOpType(src, dstType)
+	return NewConfig().SetFlags(flags).ConvertOpType(src, dstType)
 }
 
 // Struct to set optional parameters
@@ -43,10 +43,17 @@ func NewConfig() *Config {
 	}
 }
 
-func NewConfigFl(flags uint) *Config {
-	ret := NewConfig()
-	ret.Flags = flags
-	return ret
+func (c *Config) SetFlags(flags uint) *Config {
+	c.Flags = flags
+	return c
+}
+
+func (c Config) Dup() *Config {
+	return &Config{
+		Flags:         c.Flags,
+		FloatFormat:   c.FloatFormat,
+		ComplexFormat: c.ComplexFormat,
+	}
 }
 
 // Convert function
