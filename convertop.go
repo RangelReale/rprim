@@ -10,7 +10,7 @@ import (
 
 const (
 	// Whether nil pointer source values can be assigned to non-pointer destination as its zero-value
-	COP_ALLOW_NIL_TO_ZERO = 1
+	COP_ALLOW_NIL_TO_ZERO_VALUE = 1
 	// Whether to allow string to slice conversion ([]uint8 or []int32 only)
 	COP_ALLOW_STRING_TO_SLICE = 2
 	// Whether to allow slice to string conversion ([]uint8 or []int32 only)
@@ -21,12 +21,12 @@ const (
 // to a value of type dst. If the conversion is illegal, ConvertOp returns nil.
 // String conversion are supported using the strconv package
 // Conversing between pointers are allowed, including of different types.
-func ConvertOp(dst, src reflect.Value, flags uint) ConvertOpFunc {
-	return NewConfigFl(flags).ConvertOp(dst, src)
+func ConvertOp(src, dst reflect.Value, flags uint) ConvertOpFunc {
+	return NewConfigFl(flags).ConvertOp(src, dst)
 }
 
-func ConvertOpType(dstType reflect.Type, src reflect.Value, flags uint) ConvertOpFunc {
-	return NewConfigFl(flags).ConvertOpType(dstType, src)
+func ConvertOpType(src reflect.Value, dstType reflect.Type, flags uint) ConvertOpFunc {
+	return NewConfigFl(flags).ConvertOpType(src, dstType)
 }
 
 // Struct to set optional parameters
@@ -52,20 +52,25 @@ func NewConfigFl(flags uint) *Config {
 // Convert function
 type ConvertOpFunc func(reflect.Value, reflect.Type) (reflect.Value, error)
 
-func (c Config) ConvertOp(dst, src reflect.Value) ConvertOpFunc {
-	return c.ConvertOpType(dst.Type(), src)
+func (c Config) ConvertOp(src, dst reflect.Value) ConvertOpFunc {
+	return c.ConvertOpType(src, dst.Type())
 }
 
-func (c Config) ConvertOpType(dstType reflect.Type, src reflect.Value) ConvertOpFunc {
+func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOpFunc {
 	srckind := IndirectType(src.Type()).Kind()
 	dstkind := IndirectType(dstType).Kind()
 
 	// source value is nil
 	if src.Kind() == reflect.Ptr && src.IsNil() {
-		if dstType.Kind() != reflect.Ptr && !((c.Flags & COP_ALLOW_NIL_TO_ZERO) == COP_ALLOW_NIL_TO_ZERO) {
+		if (dstType.Kind() != reflect.Ptr && dstType.Kind() != reflect.Interface) && !((c.Flags & COP_ALLOW_NIL_TO_ZERO_VALUE) == COP_ALLOW_NIL_TO_ZERO_VALUE) {
 			return nil
 		}
 		return cvtNil
+	}
+
+	// target type is interface
+	if dstkind == reflect.Interface {
+		return cvtAnyInterface
 	}
 
 	// dst and src have same underlying type.
@@ -457,6 +462,13 @@ func cvtDirectPointer(v reflect.Value, typ reflect.Type) (reflect.Value, error) 
 // converOp: nil when source value is nil
 func cvtNil(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
 	return reflect.Zero(typ), nil
+}
+
+// converOp: any type to interface{}
+func cvtAnyInterface(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
+	x := reflect.New(v.Type()).Elem()
+	x.Set(v)
+	return x, nil
 }
 
 // ConvertOp: concrete -> interface
