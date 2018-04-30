@@ -57,13 +57,22 @@ func (c Config) ConvertOp(src, dst reflect.Value) ConvertOpFunc {
 }
 
 func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOpFunc {
-	// source type is interface
+	// source interface is nil
+	if src.Kind() == reflect.Interface && src.IsNil() {
+		if (dstType.Kind() != reflect.Ptr && dstType.Kind() != reflect.Interface) && !((c.Flags & COP_ALLOW_NIL_TO_ZERO_VALUE) == COP_ALLOW_NIL_TO_ZERO_VALUE) {
+			return nil
+		}
+		return cvtNil
+	}
+
+	// source type is interface, check the element
 	if src.Kind() == reflect.Interface {
 		src = src.Elem()
 	}
 
-	srckind := IndirectType(src.Type()).Kind()
-	dstkind := IndirectType(dstType).Kind()
+	if !src.IsValid() {
+		return nil
+	}
 
 	// source value is nil
 	if (src.Kind() == reflect.Ptr || src.Kind() == reflect.Interface) && src.IsNil() {
@@ -72,6 +81,9 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 		}
 		return cvtNil
 	}
+
+	srckind := IndirectType(src.Type()).Kind()
+	dstkind := IndirectType(dstType).Kind()
 
 	// target type is interface
 	if dstkind == reflect.Interface {
