@@ -66,6 +66,7 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 	}
 
 	// source type is interface, check the element
+	realsrc := src
 	if src.Kind() == reflect.Interface {
 		src = src.Elem()
 	}
@@ -92,7 +93,7 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 
 	// dst and src have same underlying type.
 	if dstkind == srckind {
-		if src.Kind() == reflect.Ptr || dstType.Kind() == reflect.Ptr {
+		if src.Kind() == reflect.Ptr || dstType.Kind() == reflect.Ptr || realsrc.Kind() == reflect.Interface || dstType.Kind() == reflect.Interface {
 			return cvtDirectPointer
 		} else {
 			return cvtDirect
