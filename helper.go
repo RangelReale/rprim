@@ -5,6 +5,17 @@ import (
 	"reflect"
 )
 
+// Helper to convert between a value and a type.
+func Convert(src reflect.Value, dstType reflect.Type) (reflect.Value, error) {
+	return NewConfig().Convert(src, dstType)
+}
+
+// Helper to convert a value to string.
+func ConvertToString(src reflect.Value) (string, error) {
+	return NewConfig().ConvertToString(src)
+}
+
+// Helper to convert between a value and a type.
 func (c *Config) Convert(src reflect.Value, dstType reflect.Type) (reflect.Value, error) {
 	cop := c.ConvertOpType(src, dstType)
 	if cop == nil {
@@ -17,14 +28,7 @@ func (c *Config) Convert(src reflect.Value, dstType reflect.Type) (reflect.Value
 	return cv, nil
 }
 
-func Convert(src reflect.Value, dstType reflect.Type) (reflect.Value, error) {
-	return NewConfig().Convert(src, dstType)
-}
-
-func ConvertToString(src reflect.Value) (string, error) {
-	return NewConfig().ConvertToString(src)
-}
-
+// Helper to convert a value to string.
 func (c *Config) ConvertToString(src reflect.Value) (string, error) {
 	t_string := reflect.TypeOf("")
 

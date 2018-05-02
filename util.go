@@ -4,6 +4,7 @@ import (
 	"reflect"
 )
 
+// Returns the underlining kind of the value, after all pointer and interface dereferences.
 func UnderliningValueKind(v reflect.Value) reflect.Kind {
 	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
 		if v.IsNil() {
@@ -19,6 +20,7 @@ func UnderliningValueKind(v reflect.Value) reflect.Kind {
 	return vt.Kind()
 }
 
+// Returns the underlining value, after all pointer and interface dereferences.
 func UnderliningValue(v reflect.Value) reflect.Value {
 	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
 		if v.IsNil() {
@@ -29,6 +31,7 @@ func UnderliningValue(v reflect.Value) reflect.Value {
 	return v
 }
 
+// Returns the underlining kind of the type, after all pointer and interface dereferences.
 func UnderliningTypeKind(v reflect.Type) reflect.Kind {
 	if v == nil {
 		return reflect.Interface
@@ -39,6 +42,7 @@ func UnderliningTypeKind(v reflect.Type) reflect.Kind {
 	return v.Kind()
 }
 
+// Returns the underlining type, after all pointer and interface dereferences.
 func UnderliningType(v reflect.Type) reflect.Type {
 	if v == nil {
 		return nil
@@ -49,6 +53,8 @@ func UnderliningType(v reflect.Type) reflect.Type {
 	return v
 }
 
+// Creates a new instance of the type, returning the root item, and the last if the type contains any
+// pointer or interface, else returns the same as root.
 func NewUnderliningValue(v reflect.Type) (root reflect.Value, last reflect.Value) {
 	root = reflect.Value{}
 	last = reflect.Value{}
@@ -70,6 +76,7 @@ func NewUnderliningValue(v reflect.Type) (root reflect.Value, last reflect.Value
 	return
 }
 
+// Checks if the kind is a simple value (no array, slice, interface, map or chan).
 func KindIsSimpleValue(k reflect.Kind) bool {
 	switch k {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
@@ -82,32 +89,10 @@ func KindIsSimpleValue(k reflect.Kind) bool {
 	}
 }
 
+// Equivalent to reflect.Indirect, but for reflect.Type.
 func IndirectType(v reflect.Type) reflect.Type {
 	if v.Kind() == reflect.Ptr {
 		return v.Elem()
 	}
 	return v
 }
-
-/*
-func IndirectTypeLast(v reflect.Type) reflect.Type {
-	for v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	return v
-}
-
-func IndirectPtrInterface(v reflect.Value) reflect.Value {
-	if v.Kind() != reflect.Ptr && v.Kind() != reflect.Interface {
-		return v
-	}
-	return v.Elem()
-}
-
-func IndirectPtrInterfaceLast(v reflect.Value) reflect.Value {
-	for (v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface) && !v.IsNil() {
-		v = v.Elem()
-	}
-	return v
-}
-*/
