@@ -3,6 +3,7 @@ package rprim
 // Most of this logic comes from the reflect package (value.go), but the result is different from it.
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -48,6 +49,11 @@ func (c *Config) SetFlags(flags uint) *Config {
 	return c
 }
 
+func (c *Config) AddFlags(flags uint) *Config {
+	c.Flags |= flags
+	return c
+}
+
 func (c Config) Dup() *Config {
 	return &Config{
 		Flags:         c.Flags,
@@ -82,7 +88,7 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 			//return cvtNil
 			proc_ret = proc_ret_nil
 		} else if !((c.Flags & COP_ALLOW_NIL_TO_ZERO_VALUE) == COP_ALLOW_NIL_TO_ZERO_VALUE) {
-			return nil
+			return cvtError(errors.New("Copying nil to zero value not allowed"))
 		} else {
 			//return cvtNil
 			proc_ret = proc_ret_nil
@@ -269,6 +275,12 @@ func makeRunes(v []rune, t reflect.Type) reflect.Value {
 	return root
 }
 
+func cvtError(err error) ConvertOpFunc {
+	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
+		return reflect.Value{}, err
+	}
+}
+
 // These conversion functions are returned by ConvertOp
 // for classes of conversions. For example, the first function, cvtInt,
 // takes any value v of signed int type and returns the value converted
@@ -437,20 +449,16 @@ func cvtStringRunes(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 
 // ConvertOp: direct copy
 func cvtDirect(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
-	x := reflect.New(typ).Elem()
-	x.Set(v)
-	return x, nil
+	root, last := NewUnderliningValue(typ)
+	last.Set(v)
+	return root, nil
 }
 
 // ConvertOp: direct copy with pointers involved
 func cvtDirectPointer(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
-	xt := IndirectType(typ)
-	x := reflect.New(xt).Elem()
-	x.Set(UnderliningValue(v))
-	if typ.Kind() == reflect.Ptr {
-		return x.Addr(), nil
-	}
-	return x, nil
+	root, last := NewUnderliningValue(typ)
+	last.Set(UnderliningValue(v))
+	return root, nil
 }
 
 // converOp: nil when source value is nil
