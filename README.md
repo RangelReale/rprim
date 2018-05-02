@@ -1,5 +1,7 @@
 # Golang primitive value copying
 
+[![GoDoc](https://godoc.org/github.com/RangelReale/rprim?status.svg)](https://godoc.org/github.com/RangelReale/rprim)
+
 This library contains functions to convert between any two Go primitive values (int, float, string, complex).
 
 The values can have any number of pointer indirections or interface{} containment in either side of the conversion, 
