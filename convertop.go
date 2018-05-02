@@ -64,126 +64,115 @@ func (c Config) ConvertOp(src, dst reflect.Value) ConvertOpFunc {
 }
 
 func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOpFunc {
-	// source interface is nil
-	if src.Kind() == reflect.Interface && src.IsNil() {
-		if (dstType != nil && dstType.Kind() != reflect.Ptr && dstType.Kind() != reflect.Interface) &&
-			!((c.Flags & COP_ALLOW_NIL_TO_ZERO_VALUE) == COP_ALLOW_NIL_TO_ZERO_VALUE) {
-			return nil
-		}
+	uk_src := UnderliningValueKind(src)
+	uk_dst := UnderliningTypeKind(dstType)
+
+	// these funcions are used to only allow setting nil after all the type compatibility checks are done
+	proc_ret := func(f ConvertOpFunc) ConvertOpFunc {
+		return f
+	}
+
+	proc_ret_nil := func(f ConvertOpFunc) ConvertOpFunc {
 		return cvtNil
 	}
 
-	// source type is interface, check the element
-	realsrc := src
-	if src.Kind() == reflect.Interface {
-		src = src.Elem()
-	}
-
-	if !src.IsValid() {
-		return nil
-	}
-
-	// source value is nil
+	// if src is nil, check if dst is nullable
 	if (src.Kind() == reflect.Ptr || src.Kind() == reflect.Interface) && src.IsNil() {
-		if (dstType.Kind() != reflect.Ptr && dstType.Kind() != reflect.Interface) && !((c.Flags & COP_ALLOW_NIL_TO_ZERO_VALUE) == COP_ALLOW_NIL_TO_ZERO_VALUE) {
+		if dstType == nil || dstType.Kind() == reflect.Ptr || dstType.Kind() == reflect.Interface {
+			//return cvtNil
+			proc_ret = proc_ret_nil
+		} else if !((c.Flags & COP_ALLOW_NIL_TO_ZERO_VALUE) == COP_ALLOW_NIL_TO_ZERO_VALUE) {
 			return nil
+		} else {
+			//return cvtNil
+			proc_ret = proc_ret_nil
 		}
-		return cvtNil
-	}
-
-	//srckind := IndirectType(src.Type()).Kind()
-	srckind := IndirectPtrInterfaceLast(src).Kind()
-	var dstkind reflect.Kind
-	if dstType != nil {
-		dstkind = IndirectType(dstType).Kind()
-	} else {
-		dstkind = reflect.Interface
 	}
 
 	// target type is interface
-	if dstkind == reflect.Interface {
-		return cvtAnyInterface
+	if uk_dst == reflect.Interface {
+		return proc_ret(cvtAnyInterface)
 	}
 
 	// dst and src have same underlying type.
-	if dstkind == srckind {
-		if src.Kind() == reflect.Ptr || dstType == nil || dstType.Kind() == reflect.Ptr || realsrc.Kind() == reflect.Interface || dstType.Kind() == reflect.Interface {
-			return cvtDirectPointer
+	if uk_src == uk_dst && KindIsSimpleValue(uk_src) && KindIsSimpleValue(uk_dst) {
+		if dstType == nil || src.Kind() == reflect.Ptr || dstType.Kind() == reflect.Ptr || src.Kind() == reflect.Interface || dstType.Kind() == reflect.Interface {
+			return proc_ret(cvtDirectPointer)
 		} else {
-			return cvtDirect
+			return proc_ret(cvtDirect)
 		}
 	}
 
-	switch srckind {
+	switch uk_src {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		switch dstkind {
+		switch uk_dst {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			return cvtInt
+			return proc_ret(cvtInt)
 		case reflect.Float32, reflect.Float64:
-			return cvtIntFloat
+			return proc_ret(cvtIntFloat)
 		case reflect.String:
-			return cvtIntString
+			return proc_ret(cvtIntString)
 		}
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		switch dstkind {
+		switch uk_dst {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			return cvtUint
+			return proc_ret(cvtUint)
 		case reflect.Float32, reflect.Float64:
-			return cvtUintFloat
+			return proc_ret(cvtUintFloat)
 		case reflect.String:
-			return cvtUintString
+			return proc_ret(cvtUintString)
 		}
 
 	case reflect.Float32, reflect.Float64:
-		switch dstkind {
+		switch uk_dst {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			return cvtFloatInt
+			return proc_ret(cvtFloatInt)
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			return cvtFloatUint
+			return proc_ret(cvtFloatUint)
 		case reflect.Float32, reflect.Float64:
-			return cvtFloat
+			return proc_ret(cvtFloat)
 		case reflect.String:
-			return cvtFloatString(c.FloatFormat)
+			return proc_ret(cvtFloatString(c.FloatFormat))
 		}
 
 	case reflect.Complex64, reflect.Complex128:
-		switch dstkind {
+		switch uk_dst {
 		case reflect.Complex64, reflect.Complex128:
-			return cvtComplex
+			return proc_ret(cvtComplex)
 		case reflect.String:
-			return cvtComplexString(c.ComplexFormat)
+			return proc_ret(cvtComplexString(c.ComplexFormat))
 		}
 
 	case reflect.String:
-		switch dstkind {
+		switch uk_dst {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			return cvtStringInt
+			return proc_ret(cvtStringInt)
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-			return cvtStringUint
+			return proc_ret(cvtStringUint)
 		case reflect.Float32, reflect.Float64:
-			return cvtStringFloat(c.FloatFormat)
+			return proc_ret(cvtStringFloat(c.FloatFormat))
 		case reflect.Complex64, reflect.Complex128:
-			return cvtStringComplex(c.ComplexFormat)
+			return proc_ret(cvtStringComplex(c.ComplexFormat))
 		case reflect.Slice:
 			if (c.Flags & COP_ALLOW_STRING_TO_SLICE) == COP_ALLOW_STRING_TO_SLICE {
 				switch dstType.Elem().Kind() {
 				case reflect.Uint8:
-					return cvtStringBytes
+					return proc_ret(cvtStringBytes)
 				case reflect.Int32:
-					return cvtStringRunes
+					return proc_ret(cvtStringRunes)
 				}
 			}
 		}
 
 	case reflect.Slice:
-		if dstkind == reflect.String {
+		if uk_dst == reflect.String {
 			if (c.Flags & COP_ALLOW_SLICE_TO_SRING) == COP_ALLOW_SLICE_TO_SRING {
 				switch src.Elem().Kind() {
 				case reflect.Uint8:
-					return cvtBytesString
+					return proc_ret(cvtBytesString)
 				case reflect.Int32:
-					return cvtRunesString
+					return proc_ret(cvtRunesString)
 				}
 			}
 		}
@@ -204,107 +193,80 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 // makeInt returns a Value of type t equal to bits (possibly truncated),
 // where t is a signed or unsigned int type.
 func makeInt(bits uint64, t reflect.Type) reflect.Value {
-	xt := IndirectType(t)
-
-	x := reflect.New(IndirectType(t)).Elem()
-	switch xt.Kind() {
+	root, last := NewUnderliningValue(t)
+	switch last.Kind() {
 	case reflect.Uint:
-		x.Set(reflect.ValueOf(uint(bits)))
+		last.Set(reflect.ValueOf(uint(bits)))
 	case reflect.Uint8:
-		x.Set(reflect.ValueOf(uint8(bits)))
+		last.Set(reflect.ValueOf(uint8(bits)))
 	case reflect.Uint16:
-		x.Set(reflect.ValueOf(uint16(bits)))
+		last.Set(reflect.ValueOf(uint16(bits)))
 	case reflect.Uint32:
-		x.Set(reflect.ValueOf(uint32(bits)))
+		last.Set(reflect.ValueOf(uint32(bits)))
 	case reflect.Uint64:
-		x.Set(reflect.ValueOf(uint64(bits)))
+		last.Set(reflect.ValueOf(uint64(bits)))
 	case reflect.Int:
-		x.Set(reflect.ValueOf(int(bits)))
+		last.Set(reflect.ValueOf(int(bits)))
 	case reflect.Int8:
-		x.Set(reflect.ValueOf(int8(bits)))
+		last.Set(reflect.ValueOf(int8(bits)))
 	case reflect.Int16:
-		x.Set(reflect.ValueOf(int16(bits)))
+		last.Set(reflect.ValueOf(int16(bits)))
 	case reflect.Int32:
-		x.Set(reflect.ValueOf(int32(bits)))
+		last.Set(reflect.ValueOf(int32(bits)))
 	case reflect.Int64:
-		x.Set(reflect.ValueOf(int64(bits)))
+		last.Set(reflect.ValueOf(int64(bits)))
 	default:
-		panic("Invalid value for makeInt")
+		panic(fmt.Sprintf("Invalid value for makeInt: %s", last.Kind().String()))
 	}
-	if t.Kind() == reflect.Ptr {
-		return x.Addr()
-	}
-	return x
+	return root
 }
 
 // makeFloat returns a Value of type t equal to v (possibly truncated to float32),
 // where t is a float32 or float64 type.
 func makeFloat(v float64, t reflect.Type) reflect.Value {
-	xt := IndirectType(t)
-
-	x := reflect.New(xt).Elem()
-	switch xt.Kind() {
+	root, last := NewUnderliningValue(t)
+	switch last.Kind() {
 	case reflect.Float32:
-		x.Set(reflect.ValueOf(float32(v)))
+		last.Set(reflect.ValueOf(float32(v)))
 	case reflect.Float64:
-		x.Set(reflect.ValueOf(float64(v)))
+		last.Set(reflect.ValueOf(float64(v)))
 	default:
 		panic("Invalid value for makeFloat")
 	}
-	if t.Kind() == reflect.Ptr {
-		return x.Addr()
-	}
-	return x
+	return root
 }
 
 // makeComplex returns a Value of type t equal to v (possibly truncated to complex64),
 // where t is a complex64 or complex128 type.
 func makeComplex(v complex128, t reflect.Type) reflect.Value {
-	xt := IndirectType(t)
-
-	x := reflect.New(xt).Elem()
-	switch xt.Kind() {
+	root, last := NewUnderliningValue(t)
+	switch last.Kind() {
 	case reflect.Complex64:
-		x.Set(reflect.ValueOf(complex64(v)))
+		last.Set(reflect.ValueOf(complex64(v)))
 	case reflect.Complex128:
-		x.Set(reflect.ValueOf(complex128(v)))
+		last.Set(reflect.ValueOf(complex128(v)))
 	default:
 		panic("Invalid value for makeComplex")
 	}
-	if t.Kind() == reflect.Ptr {
-		return x.Addr()
-	}
-	return x
+	return root
 }
 
 func makeString(v string, t reflect.Type) reflect.Value {
-	xt := IndirectType(t)
-	x := reflect.New(xt).Elem()
-	x.SetString(v)
-	if t.Kind() == reflect.Ptr {
-		return x.Addr()
-	}
-	return x
+	root, last := NewUnderliningValue(t)
+	last.SetString(v)
+	return root
 }
 
 func makeBytes(v []byte, t reflect.Type) reflect.Value {
-	xt := IndirectType(t)
-	x := reflect.New(xt).Elem()
-	x.SetBytes(v)
-	if t.Kind() == reflect.Ptr {
-		return x.Addr()
-	}
-	return x
+	root, last := NewUnderliningValue(t)
+	last.SetBytes(v)
+	return root
 }
 
 func makeRunes(v []rune, t reflect.Type) reflect.Value {
-	xt := IndirectType(t)
-	x := reflect.New(xt).Elem()
-	x.SetString(string(v))
-	if t.Kind() == reflect.Ptr {
-		return x.Addr()
-	}
-	return x
+	root, last := NewUnderliningValue(t)
+	last.SetString(string(v))
+	return root
 }
 
 // These conversion functions are returned by ConvertOp
@@ -314,58 +276,58 @@ func makeRunes(v []rune, t reflect.Type) reflect.Value {
 
 // ConvertOp: intXX -> [u]intXX
 func cvtInt(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeInt(uint64(IndirectPtrInterfaceLast(v).Int()), t), nil
+	return makeInt(uint64(UnderliningValue(v).Int()), t), nil
 }
 
 // ConvertOp: uintXX -> [u]intXX
 func cvtUint(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeInt(IndirectPtrInterfaceLast(v).Uint(), t), nil
+	return makeInt(UnderliningValue(v).Uint(), t), nil
 }
 
 // ConvertOp: floatXX -> intXX
 func cvtFloatInt(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeInt(uint64(int64(IndirectPtrInterfaceLast(v).Float())), t), nil
+	return makeInt(uint64(int64(UnderliningValue(v).Float())), t), nil
 }
 
 // ConvertOp: floatXX -> uintXX
 func cvtFloatUint(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeInt(uint64(IndirectPtrInterfaceLast(v).Float()), t), nil
+	return makeInt(uint64(UnderliningValue(v).Float()), t), nil
 }
 
 // ConvertOp: intXX -> floatXX
 func cvtIntFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeFloat(float64(IndirectPtrInterfaceLast(v).Int()), t), nil
+	return makeFloat(float64(UnderliningValue(v).Int()), t), nil
 }
 
 // ConvertOp: uintXX -> floatXX
 func cvtUintFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeFloat(float64(IndirectPtrInterfaceLast(v).Uint()), t), nil
+	return makeFloat(float64(UnderliningValue(v).Uint()), t), nil
 }
 
 // ConvertOp: floatXX -> floatXX
 func cvtFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeFloat(IndirectPtrInterfaceLast(v).Float(), t), nil
+	return makeFloat(UnderliningValue(v).Float(), t), nil
 }
 
 // ConvertOp: complexXX -> complexXX
 func cvtComplex(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeComplex(IndirectPtrInterfaceLast(v).Complex(), t), nil
+	return makeComplex(UnderliningValue(v).Complex(), t), nil
 }
 
 // ConvertOp: intXX -> string
 func cvtIntString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(strconv.FormatInt(IndirectPtrInterfaceLast(v).Int(), 10), t), nil
+	return makeString(strconv.FormatInt(UnderliningValue(v).Int(), 10), t), nil
 }
 
 // ConvertOp: uintXX -> string
 func cvtUintString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(strconv.FormatUint(IndirectPtrInterfaceLast(v).Uint(), 10), t), nil
+	return makeString(strconv.FormatUint(UnderliningValue(v).Uint(), 10), t), nil
 }
 
 // ConvertOp: floatXX -> string
 func cvtFloatString(format string) ConvertOpFunc {
 	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-		return makeString(fmt.Sprintf(format, IndirectPtrInterfaceLast(v).Float()), t), nil
+		return makeString(fmt.Sprintf(format, UnderliningValue(v).Float()), t), nil
 	}
 }
 
@@ -378,7 +340,7 @@ func cvtFloatString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 // ConvertOp: complexXX -> string
 func cvtComplexString(format string) ConvertOpFunc {
 	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-		return makeString(fmt.Sprintf(format, IndirectPtrInterfaceLast(v).Complex()), t), nil
+		return makeString(fmt.Sprintf(format, UnderliningValue(v).Complex()), t), nil
 	}
 }
 
@@ -390,12 +352,12 @@ func cvtComplexString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 
 // ConvertOp: []byte -> string
 func cvtBytesString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(string(IndirectPtrInterfaceLast(v).Bytes()), t), nil
+	return makeString(string(UnderliningValue(v).Bytes()), t), nil
 }
 
 // ConvertOp: string -> intXX
 func cvtStringInt(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	cv, err := strconv.ParseInt(IndirectPtrInterfaceLast(v).String(), 10, 64)
+	cv, err := strconv.ParseInt(UnderliningValue(v).String(), 10, 64)
 	if err != nil {
 		return reflect.Value{}, fmt.Errorf("Error converting string to int: %v", err)
 	}
@@ -404,7 +366,7 @@ func cvtStringInt(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 
 // ConvertOp: string -> uintXX
 func cvtStringUint(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	cv, err := strconv.ParseUint(IndirectPtrInterfaceLast(v).String(), 10, 64)
+	cv, err := strconv.ParseUint(UnderliningValue(v).String(), 10, 64)
 	if err != nil {
 		return reflect.Value{}, fmt.Errorf("Error converting string to uint: %v", err)
 	}
@@ -415,7 +377,7 @@ func cvtStringUint(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 func cvtStringFloat(format string) ConvertOpFunc {
 	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 		var cv float64
-		_, err := fmt.Sscanf(IndirectPtrInterfaceLast(v).String(), format, &cv)
+		_, err := fmt.Sscanf(UnderliningValue(v).String(), format, &cv)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("Error converting string to float: %v", err)
 		}
@@ -439,7 +401,7 @@ func cvtStringFloat(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 func cvtStringComplex(format string) ConvertOpFunc {
 	return func(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 		var cv complex128
-		_, err := fmt.Sscanf(IndirectPtrInterfaceLast(v).String(), format, &cv)
+		_, err := fmt.Sscanf(UnderliningValue(v).String(), format, &cv)
 		if err != nil {
 			return reflect.Value{}, fmt.Errorf("Error converting string to complex: %v", err)
 		}
@@ -460,17 +422,17 @@ func cvtStringComplex(v reflect.Value, t reflect.Type) (reflect.Value, error) {
 
 // ConvertOp: string -> []byte
 func cvtStringBytes(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeBytes([]byte(IndirectPtrInterfaceLast(v).String()), t), nil
+	return makeBytes([]byte(UnderliningValue(v).String()), t), nil
 }
 
 // ConvertOp: []rune -> string
 func cvtRunesString(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeString(string(IndirectPtrInterfaceLast(v).Interface().([]int32)), t), nil
+	return makeString(string(UnderliningValue(v).Interface().([]int32)), t), nil
 }
 
 // ConvertOp: string -> []rune
 func cvtStringRunes(v reflect.Value, t reflect.Type) (reflect.Value, error) {
-	return makeRunes([]rune(IndirectPtrInterfaceLast(v).String()), t), nil
+	return makeRunes([]rune(UnderliningValue(v).String()), t), nil
 }
 
 // ConvertOp: direct copy
@@ -484,7 +446,7 @@ func cvtDirect(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
 func cvtDirectPointer(v reflect.Value, typ reflect.Type) (reflect.Value, error) {
 	xt := IndirectType(typ)
 	x := reflect.New(xt).Elem()
-	x.Set(IndirectPtrInterfaceLast(v))
+	x.Set(UnderliningValue(v))
 	if typ.Kind() == reflect.Ptr {
 		return x.Addr(), nil
 	}
