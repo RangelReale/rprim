@@ -39,6 +39,16 @@ func UnderliningTypeKind(v reflect.Type) reflect.Kind {
 	return v.Kind()
 }
 
+func UnderliningType(v reflect.Type) reflect.Type {
+	if v == nil {
+		return nil
+	}
+	for v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	return v
+}
+
 func NewUnderliningValue(v reflect.Type) (root reflect.Value, last reflect.Value) {
 	root = reflect.Value{}
 	last = reflect.Value{}

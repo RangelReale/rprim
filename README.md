@@ -7,6 +7,12 @@ even if in different number.
 
 For string targets, it is possible to convert a printf/scanf format.
 
+### Install
+
+```
+go get github.com/RangelReale/rprim
+```
+
 ### Examples
 
 String helpers:
