@@ -21,6 +21,22 @@ func UnderliningValueKind(v reflect.Value) reflect.Kind {
 	return vt.Kind()
 }
 
+// Returns the underlining type of the value, after all pointer and interface dereferences.
+func UnderliningValueType(v reflect.Value) reflect.Type {
+	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			break
+		}
+		v = v.Elem()
+	}
+	// if there is nil at any point, must walk using the type instead
+	vt := v.Type()
+	for vt.Kind() == reflect.Ptr {
+		vt = vt.Elem()
+	}
+	return vt
+}
+
 // Returns the underlining value, after all pointer and interface dereferences.
 func UnderliningValue(v reflect.Value) reflect.Value {
 	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
