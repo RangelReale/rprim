@@ -80,11 +80,50 @@ func TestNewUnderliningValue(t *testing.T) {
 	var i ***int
 	itype := reflect.TypeOf(i)
 	root, last = NewUnderliningValue(itype)
+
 	_, isi := root.Interface().(***int)
 	if !isi {
 		t.Fatal("Returned type is different from the source type")
 	}
 	if root.Kind() != reflect.Ptr || last.Kind() != reflect.Int {
 		t.Fatalf("Values should be pointer and int, but are %s and %s", root.Kind().String(), last.Kind().String())
+	}
+}
+
+func TestEnsureUnderliningValue(t *testing.T) {
+	var i ****int
+
+	ri := reflect.ValueOf(&i)
+
+	last, err := EnsureUnderliningValue(ri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if *i == nil || **i == nil || ***i == nil || ****i != 0 {
+		t.Fatal("Pointer value was not set correctly")
+	}
+
+	if last.Kind() != reflect.Int || last.Int() != 0 {
+		t.Fatal("Pointed value was not set correctly")
+	}
+}
+
+func TestEnsureUnderliningValueInterface(t *testing.T) {
+	var i ****interface{}
+
+	ri := reflect.ValueOf(&i)
+
+	last, err := EnsureUnderliningValue(ri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if *i == nil || **i == nil || ***i == nil || ****i != nil {
+		t.Fatal("Pointer value was not set correctly")
+	}
+
+	if last.Kind() != reflect.Interface || !last.IsNil() {
+		t.Fatal("Pointed value was not set correctly")
 	}
 }

@@ -1,6 +1,7 @@
 package rprim
 
 import (
+	"errors"
 	"reflect"
 )
 
@@ -75,6 +76,23 @@ func NewUnderliningValue(v reflect.Type) (root reflect.Value, last reflect.Value
 	}
 
 	return
+}
+
+// Ensure that all the passed value pointer indirections are not nil, and returns the last
+// non-pointer value.
+func EnsureUnderliningValue(v reflect.Value) (last reflect.Value, err error) {
+	cur := v
+	for cur.Kind() == reflect.Ptr {
+		if cur.IsNil() {
+			if cur.CanSet() {
+				cur.Set(reflect.New(cur.Type().Elem()))
+			} else {
+				return reflect.Value{}, errors.New("Pointer value is not settable")
+			}
+		}
+		cur = cur.Elem()
+	}
+	return cur, nil
 }
 
 // Checks if the kind is a simple value (no array, slice, interface, map or chan).
