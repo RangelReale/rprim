@@ -55,6 +55,7 @@ func UnderliningType(v reflect.Type) reflect.Type {
 
 // Creates a new instance of the type, returning the root item, and the last if the type contains any
 // pointer or interface, else returns the same as root.
+// The last item is always de zero-value of the type (nil if value is nillable).
 func NewUnderliningValue(v reflect.Type) (root reflect.Value, last reflect.Value) {
 	root = reflect.Value{}
 	last = reflect.Value{}
