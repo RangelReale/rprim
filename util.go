@@ -32,6 +32,17 @@ func UnderliningValue(v reflect.Value) reflect.Value {
 	return v
 }
 
+// Returns if the underlining value is nil, even in any amount of pointer indirection
+func UnderliningValueIsNil(v reflect.Value) bool {
+	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return true
+		}
+		v = v.Elem()
+	}
+	return false
+}
+
 // Returns the underlining kind of the type, after all pointer and interface dereferences.
 func UnderliningTypeKind(v reflect.Type) reflect.Kind {
 	if v == nil {
