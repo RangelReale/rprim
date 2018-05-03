@@ -73,6 +73,9 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 	uk_src := UnderliningValueKind(src)
 	uk_dst := UnderliningTypeKind(dstType)
 
+	may_be_direct_assignable := (dstType == nil || UnderliningType(src.Type()).AssignableTo(UnderliningType(dstType))) ||
+		src.Kind() == reflect.Interface || dstType.Kind() == reflect.Interface
+
 	// these funcions are used to only allow setting nil after all the type compatibility checks are done
 	proc_ret := func(f ConvertOpFunc) ConvertOpFunc {
 		return f
@@ -101,7 +104,7 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 	}
 
 	// dst and src have same underlying type.
-	if uk_src == uk_dst && KindIsSimpleValue(uk_src) && KindIsSimpleValue(uk_dst) {
+	if may_be_direct_assignable && uk_src == uk_dst && KindIsSimpleValue(uk_src) && KindIsSimpleValue(uk_dst) {
 		if dstType == nil || src.Kind() == reflect.Ptr || dstType.Kind() == reflect.Ptr || src.Kind() == reflect.Interface || dstType.Kind() == reflect.Interface {
 			return proc_ret(cvtDirectPointer)
 		} else {
@@ -160,6 +163,8 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 			return proc_ret(cvtStringFloat(c.FloatFormat))
 		case reflect.Complex64, reflect.Complex128:
 			return proc_ret(cvtStringComplex(c.ComplexFormat))
+		case reflect.String:
+			return proc_ret(cvtDirectPointer)
 		case reflect.Slice:
 			if (c.Flags & COP_ALLOW_STRING_TO_SLICE) == COP_ALLOW_STRING_TO_SLICE {
 				switch dstType.Elem().Kind() {
@@ -200,30 +205,38 @@ func (c Config) ConvertOpType(src reflect.Value, dstType reflect.Type) ConvertOp
 // where t is a signed or unsigned int type.
 func makeInt(bits uint64, t reflect.Type) reflect.Value {
 	root, last := NewUnderliningValue(t)
+	var newvalue reflect.Value
 	switch last.Kind() {
 	case reflect.Uint:
-		last.Set(reflect.ValueOf(uint(bits)))
+		newvalue = reflect.ValueOf(uint(bits))
 	case reflect.Uint8:
-		last.Set(reflect.ValueOf(uint8(bits)))
+		newvalue = reflect.ValueOf(uint8(bits))
 	case reflect.Uint16:
-		last.Set(reflect.ValueOf(uint16(bits)))
+		newvalue = reflect.ValueOf(uint16(bits))
 	case reflect.Uint32:
-		last.Set(reflect.ValueOf(uint32(bits)))
+		newvalue = reflect.ValueOf(uint32(bits))
 	case reflect.Uint64:
-		last.Set(reflect.ValueOf(uint64(bits)))
+		newvalue = reflect.ValueOf(uint64(bits))
 	case reflect.Int:
-		last.Set(reflect.ValueOf(int(bits)))
+		newvalue = reflect.ValueOf(int(bits))
 	case reflect.Int8:
-		last.Set(reflect.ValueOf(int8(bits)))
+		newvalue = reflect.ValueOf(int8(bits))
 	case reflect.Int16:
-		last.Set(reflect.ValueOf(int16(bits)))
+		newvalue = reflect.ValueOf(int16(bits))
 	case reflect.Int32:
-		last.Set(reflect.ValueOf(int32(bits)))
+		newvalue = reflect.ValueOf(int32(bits))
 	case reflect.Int64:
-		last.Set(reflect.ValueOf(int64(bits)))
+		newvalue = reflect.ValueOf(int64(bits))
 	default:
 		panic(fmt.Sprintf("Invalid value for makeInt: %s", last.Kind().String()))
 	}
+
+	if !newvalue.Type().AssignableTo(last.Type()) {
+		// named values are not directly assignable
+		newvalue = newvalue.Convert(last.Type())
+	}
+
+	last.Set(newvalue)
 	return root
 }
 
@@ -231,14 +244,22 @@ func makeInt(bits uint64, t reflect.Type) reflect.Value {
 // where t is a float32 or float64 type.
 func makeFloat(v float64, t reflect.Type) reflect.Value {
 	root, last := NewUnderliningValue(t)
+	var newvalue reflect.Value
 	switch last.Kind() {
 	case reflect.Float32:
-		last.Set(reflect.ValueOf(float32(v)))
+		newvalue = reflect.ValueOf(float32(v))
 	case reflect.Float64:
-		last.Set(reflect.ValueOf(float64(v)))
+		newvalue = reflect.ValueOf(float64(v))
 	default:
 		panic("Invalid value for makeFloat")
 	}
+
+	if !newvalue.Type().AssignableTo(last.Type()) {
+		// named values are not directly assignable
+		newvalue = newvalue.Convert(last.Type())
+	}
+	last.Set(newvalue)
+
 	return root
 }
 
@@ -246,32 +267,55 @@ func makeFloat(v float64, t reflect.Type) reflect.Value {
 // where t is a complex64 or complex128 type.
 func makeComplex(v complex128, t reflect.Type) reflect.Value {
 	root, last := NewUnderliningValue(t)
+	var newvalue reflect.Value
 	switch last.Kind() {
 	case reflect.Complex64:
-		last.Set(reflect.ValueOf(complex64(v)))
+		newvalue = reflect.ValueOf(complex64(v))
 	case reflect.Complex128:
-		last.Set(reflect.ValueOf(complex128(v)))
+		newvalue = reflect.ValueOf(complex128(v))
 	default:
 		panic("Invalid value for makeComplex")
 	}
+
+	if !newvalue.Type().AssignableTo(last.Type()) {
+		// named values are not directly assignable
+		newvalue = newvalue.Convert(last.Type())
+	}
+	last.Set(newvalue)
+
 	return root
 }
 
 func makeString(v string, t reflect.Type) reflect.Value {
 	root, last := NewUnderliningValue(t)
-	last.SetString(v)
+	newvalue := reflect.ValueOf(v)
+	if !newvalue.Type().AssignableTo(last.Type()) {
+		// named values are not directly assignable
+		newvalue = newvalue.Convert(last.Type())
+	}
+	last.Set(newvalue)
 	return root
 }
 
 func makeBytes(v []byte, t reflect.Type) reflect.Value {
 	root, last := NewUnderliningValue(t)
-	last.SetBytes(v)
+	newvalue := reflect.ValueOf(v)
+	if !newvalue.Type().AssignableTo(last.Type()) {
+		// named values are not directly assignable
+		newvalue = newvalue.Convert(last.Type())
+	}
+	last.Set(newvalue)
 	return root
 }
 
 func makeRunes(v []rune, t reflect.Type) reflect.Value {
 	root, last := NewUnderliningValue(t)
-	last.SetString(string(v))
+	newvalue := reflect.ValueOf(string(v))
+	if !newvalue.Type().AssignableTo(last.Type()) {
+		// named values are not directly assignable
+		newvalue = newvalue.Convert(last.Type())
+	}
+	last.Set(newvalue)
 	return root
 }
 

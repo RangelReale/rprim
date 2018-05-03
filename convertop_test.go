@@ -192,10 +192,48 @@ func TestInterfaceTarget(t *testing.T) {
 	}
 
 	if copValue.Kind() != reflect.Interface && copValue.Kind() != reflect.Int {
-		t.Fatal("Expected an interface with int, got %s", copValue.Kind().String())
+		t.Fatalf("Expected an interface with int, got %s", copValue.Kind().String())
 	}
 
 	if copValue.Int() != int64(test_int_value) {
-		t.Fatal("Expected value %d, got %d", int64(test_int_value), copValue.Int())
+		t.Fatalf("Expected value %d, got %d", int64(test_int_value), copValue.Int())
+	}
+}
+
+func TestNamedType(t *testing.T) {
+
+	type PT_TI1 int
+	type PT_TI2 int
+
+	const (
+		TI1_FIRST  PT_TI1 = 0
+		TI1_SECOND        = 1
+	)
+
+	const (
+		TI2_FIRST  PT_TI2 = 0
+		TI2_SECOND        = 1
+	)
+
+	v1 := TI1_SECOND
+
+	var v2 PT_TI2
+
+	srcV1 := reflect.ValueOf(v1)
+	destV2 := reflect.TypeOf(v2)
+
+	cop := NewConfig().ConvertOpType(srcV1, destV2)
+	if cop == nil {
+		t.Fatal("Converter not found for enum to enum")
+	}
+
+	copValue, err := cop(srcV1, destV2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	v2 = copValue.Interface().(PT_TI2)
+	if v2 != TI2_SECOND {
+		t.Fatalf("Enum value should be TI2_SECOND, is %v", v2)
 	}
 }
